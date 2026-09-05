@@ -1,0 +1,6 @@
+{
+  "name": "حسابداری شخصی هوشمند",
+  "description": "اپلیکیشن تک‌صفحه‌ای و PWA حسابداری شخصی با ثبت هوشمند تراکنش‌ها توسط هوش مصنوعی Gemini و ذخیره‌سازی ابری دیتابیس در Google Drive",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
