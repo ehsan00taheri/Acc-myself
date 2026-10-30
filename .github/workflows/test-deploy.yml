@@ -14,7 +14,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-          external_repository: YOUR_USERNAME/YOUR_PUBLIC_REPO # نام کاربری و مخزن عمومی خود را وارد کنید
+          external_repository: ehsan00taheri/FI-Acc # نام کاربری و مخزن عمومی خود را وارد کنید
           publish_branch: test-branch # یک شاخه تستی برای جلوگیری از تغییر سایت اصلی
           publish_dir: ./ # یک پوشه خالی یا ساده را برای تست استفاده کنید
           # این خط باعث می‌شود Action فقط تست اتصال کند و فایلی را منتقل نکند
