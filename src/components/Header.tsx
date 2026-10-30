@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-700">
-                ثبت سریع دخل و خرج با هوش مصنوعی و همگام‌سازی ابری
+                ثبت دخل و خرج شخصی و همگام‌سازی ابری با گوگل درایو
               </p>
             </div>
           </div>
