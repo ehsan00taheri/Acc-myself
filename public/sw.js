@@ -1,18 +1,21 @@
-const CACHE_NAME = 'hesabdari-pwa-v2';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-maskable-192.png',
-  '/icons/icon-maskable-512.png'
-];
+const CACHE_NAME = 'hesabdari-pwa-v3';
 
 self.addEventListener('install', (event) => {
+  const scope = self.registration.scope;
+  const staticAssets = [
+    scope,
+    new URL('manifest.webmanifest', scope).href,
+    new URL('icons/icon-192.png', scope).href,
+    new URL('icons/icon-512.png', scope).href,
+    new URL('icons/icon-maskable-192.png', scope).href,
+    new URL('icons/icon-maskable-512.png', scope).href
+  ];
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(staticAssets).catch((err) => {
+        console.warn('Pre-cache warning (safe to ignore in preview):', err);
+      });
     }).then(() => self.skipWaiting())
   );
 });

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -18,7 +19,8 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
+      const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+      navigator.serviceWorker.register(swUrl).catch((err) => {
         console.log('SW registration note:', err);
       });
     });
