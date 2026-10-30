@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
@@ -33,7 +35,7 @@ let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 
 /**
- * مقداردهی اولیه شنونده وضعیت ورود کاربر
+ * مقداردهی اولیه شنونده وضعیت ورود کاربر به همراه بازیابی نتیجه در صورت هدایت مجدد (Redirect) در مرورگرهای موبایل
  */
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -43,6 +45,23 @@ export const initAuth = (
     if (onAuthFailure) onAuthFailure();
     return () => {};
   }
+
+  // بررسی وضعیت ورود پس از هدایت صفحه در موبایل (Redirect Result)
+  getRedirectResult(auth)
+    .then((result) => {
+      if (result) {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          cachedAccessToken = credential.accessToken;
+          if (onAuthSuccess) {
+            onAuthSuccess(result.user, credential.accessToken);
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      console.warn('Redirect sign-in resolution:', err);
+    });
 
   try {
     return onAuthStateChanged(auth, async (user: User | null) => {
@@ -67,11 +86,13 @@ export const initAuth = (
 
 /**
  * ورود با اکانت گوگل و دریافت Access Token برای Google Drive
+ * با پشتیبانی از پاپ‌آپ و پشتیبانی خودکار از Redirect در صورت مسدود بودن پاپ‌آپ روی گوشی
  */
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   if (!auth || !provider) {
     throw new Error('سرویس احراز هویت در این پنجره محدود شده است. لطفاً برنامه را در یک تب جدید (Open in new tab) باز کنید.');
   }
+
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -83,7 +104,18 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    console.error('خطای ورود به گوگل:', error);
+    console.error('خطای ورود به گوگل (Popup):', error?.code, error?.message);
+
+    // اگر پاپ‌آپ در مرورگر موبایل مسدود شد یا در تلفن همراه هستیم، به حالت هدایت مستقیم (Redirect) سوئیچ می‌کنیم
+    if (
+      error?.code === 'auth/popup-blocked' ||
+      error?.code === 'auth/cancelled-popup-request'
+    ) {
+      console.log('سوئیچ خودکار به ورود با Redirect در مرورگر موبایل...');
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+
     throw error;
   } finally {
     isSigningIn = false;

@@ -3,6 +3,16 @@
  */
 
 export type TransactionType = 'expense' | 'income';
+export type CategoryType = 'expense' | 'income' | 'both';
+
+export interface CustomCategory {
+  id: string;
+  name: string;
+  type: CategoryType;
+  iconName: string;
+  color: string;
+  isCustom?: boolean;
+}
 
 export interface Transaction {
   id: string;

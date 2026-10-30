@@ -1,66 +1,40 @@
 import React from 'react';
 import {
-  Utensils,
-  Car,
-  Home,
-  ShoppingBag,
-  HeartPulse,
-  Sparkles,
-  BookOpen,
-  Wallet,
-  TrendingUp,
-  Receipt,
   Trash2,
   Calendar,
   Layers,
+  Edit2,
+  Tag,
 } from 'lucide-react';
-import { Transaction, FilterType } from '../types';
-import { formatPersianCurrency, toPersianDigits, getCategoryStyle } from '../utils/persian';
+import { Transaction, FilterType, CustomCategory } from '../types';
+import {
+  formatPersianCurrency,
+  toPersianDigits,
+  getCategoryStyle,
+} from '../utils/persian';
+import { CategoryIcon } from './CategoryIcon';
 
 interface TransactionListProps {
   transactions: Transaction[];
   filter: FilterType;
   onFilterChange: (filter: FilterType) => void;
   onDeleteTransaction: (id: string) => void;
+  onEditTransaction: (tx: Transaction) => void;
+  customCategories?: CustomCategory[];
+  onOpenCategoryManager?: () => void;
 }
 
-// کامپوننت انتخاب و رندر آیکون مربوط به دسته‌بندی
-const CategoryIcon: React.FC<{ iconName: string; className?: string }> = ({
-  iconName,
-  className = 'w-4 h-4',
-}) => {
-  switch (iconName) {
-    case 'Utensils':
-      return <Utensils className={className} />;
-    case 'Car':
-      return <Car className={className} />;
-    case 'Home':
-      return <Home className={className} />;
-    case 'ShoppingBag':
-      return <ShoppingBag className={className} />;
-    case 'HeartPulse':
-      return <HeartPulse className={className} />;
-    case 'Sparkles':
-      return <Sparkles className={className} />;
-    case 'BookOpen':
-      return <BookOpen className={className} />;
-    case 'Wallet':
-      return <Wallet className={className} />;
-    case 'TrendingUp':
-      return <TrendingUp className={className} />;
-    default:
-      return <Receipt className={className} />;
-  }
-};
-
 /**
- * لیست تراکنش‌ها با فیلتر ساده (همه، هزینه‌ها، درآمدها) و مرتب‌سازی جدیدترین در بالا
+ * لیست تراکنش‌ها با فیلتر، قابلیت ویرایش، دسته‌بندی‌های شخصی و حذف
  */
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   filter,
   onFilterChange,
   onDeleteTransaction,
+  onEditTransaction,
+  customCategories = [],
+  onOpenCategoryManager,
 }) => {
   // فیلتر کردن تراکنش‌ها
   const filteredTransactions = transactions.filter((tx) => {
@@ -81,13 +55,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     <section className="w-full bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
       {/* هدر بخش لیست و فیلترها */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
-        <div>
+        <div className="flex items-center gap-2">
           <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <span>تاریخچه تراکنش‌ها</span>
             <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
               {toPersianDigits(sortedTransactions.length)} مورد
             </span>
           </h2>
+
+          {onOpenCategoryManager && (
+            <button
+              onClick={onOpenCategoryManager}
+              className="text-[11px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition font-medium flex items-center gap-1 cursor-pointer mr-2"
+              title="مدیریت دسته‌بندی‌ها"
+            >
+              <Tag className="w-3 h-3" />
+              <span>مدیریت دسته‌ها</span>
+            </button>
+          )}
         </div>
 
         {/* فیلتر ساده: همه / هزینه‌ها / درآمدها */}
@@ -139,15 +124,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           </p>
           <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
             {filter !== 'all'
-              ? 'در این دسته‌بندی هنوز تراکنشی ثبت نشده است.'
-              : 'برای شروع، یک جمله مثل «امروز ناهار ۳۵ هزار تومان» در کادر بالا بنویسید.'}
+              ? 'در این فیلتر هنوز تراکنشی ثبت نشده است.'
+              : 'برای شروع، جمله‌ای مثل «ناهار ۳۵ هزار تومان با کارت ملی» بنویسید.'}
           </p>
         </div>
       ) : (
         <div className="divide-y divide-slate-100 mt-1">
           {sortedTransactions.map((tx) => {
-            const categoryStyle = getCategoryStyle(tx.category);
+            const categoryStyle = getCategoryStyle(tx.category, customCategories);
             const isIncome = tx.type === 'income';
+
+            // آیا دسته شخصی است؟
+            const matchingCustom = customCategories.find(
+              (c) => c.name.trim().toLowerCase() === (tx.category || '').trim().toLowerCase()
+            );
 
             return (
               <div
@@ -158,7 +148,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 {/* بخش سمت راست: آیکون دسته‌بندی و عنوان و توضیحات */}
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle.bgClass} ${categoryStyle.textClass}`}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white shadow-xs"
+                    style={{ backgroundColor: categoryStyle.chartColor }}
                   >
                     <CategoryIcon
                       iconName={categoryStyle.iconName}
@@ -179,15 +170,33 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${categoryStyle.badgeClass}`}
+                        className="text-[10px] px-2 py-0.5 rounded-md border font-medium flex items-center gap-1"
+                        style={{
+                          backgroundColor: `${categoryStyle.chartColor}15`,
+                          borderColor: `${categoryStyle.chartColor}40`,
+                          color: categoryStyle.chartColor,
+                        }}
                       >
-                        {tx.category}
+                        <span>{tx.category}</span>
+                        {matchingCustom && (
+                          <span className="text-[9px] opacity-75 font-normal">
+                            (شخصی)
+                          </span>
+                        )}
                       </span>
+
                       <span className="flex items-center gap-1 text-[11px] text-slate-400">
                         <Calendar className="w-3 h-3 text-slate-400" />
                         <span>{tx.persianDate}</span>
                       </span>
-                      {tx.rawText && tx.rawText !== tx.title && (
+
+                      {tx.note && (
+                        <span className="text-slate-500 text-[11px] truncate max-w-[150px]">
+                          • {tx.note}
+                        </span>
+                      )}
+
+                      {tx.rawText && tx.rawText !== tx.title && !tx.note && (
                         <span className="hidden md:inline truncate max-w-[200px] text-slate-400 text-[11px]">
                           «{tx.rawText}»
                         </span>
@@ -196,8 +205,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   </div>
                 </div>
 
-                {/* بخش سمت چپ: مبلغ و دکمه حذف */}
-                <div className="flex items-center gap-3 shrink-0">
+                {/* بخش سمت چپ: مبلغ و دکمه‌های ویرایش و حذف */}
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                   <div className="text-left">
                     <div
                       className={`text-sm sm:text-base font-bold ${
@@ -212,14 +221,25 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     </div>
                   </div>
 
-                  {/* دکمه حذف تراکنش */}
-                  <button
-                    onClick={() => onDeleteTransaction(tx.id)}
-                    title="حذف تراکنش"
-                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* دکمه ویرایش تراکنش */}
+                    <button
+                      onClick={() => onEditTransaction(tx)}
+                      title="ویرایش تراکنش و تغییر دسته‌بندی"
+                      className="p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer opacity-80 group-hover:opacity-100"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    {/* دکمه حذف تراکنش */}
+                    <button
+                      onClick={() => onDeleteTransaction(tx.id)}
+                      title="حذف تراکنش"
+                      className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer opacity-80 group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PieChart as PieIcon, CreditCard, Layers } from 'lucide-react';
-import { Transaction } from '../types';
+import { Transaction, CustomCategory } from '../types';
 import {
   formatPersianCurrency,
   toPersianDigits,
@@ -13,6 +13,7 @@ interface ExpenseDistributionChartProps {
   selectedAccountFilter: string;
   onAccountFilterChange: (account: string) => void;
   availableAccounts: string[];
+  customCategories?: CustomCategory[];
 }
 
 interface CategoryExpenseData {
@@ -31,6 +32,7 @@ export const ExpenseDistributionChart: React.FC<ExpenseDistributionChartProps> =
   selectedAccountFilter,
   onAccountFilterChange,
   availableAccounts,
+  customCategories = [],
 }) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -61,7 +63,7 @@ export const ExpenseDistributionChart: React.FC<ExpenseDistributionChartProps> =
   const chartData: CategoryExpenseData[] = Object.entries(categoryMap)
     .map(([catName, data]) => {
       const percentage = totalExpenseSum > 0 ? (data.total / totalExpenseSum) * 100 : 0;
-      const style = getCategoryStyle(catName);
+      const style = getCategoryStyle(catName, customCategories);
       return {
         name: catName,
         value: data.total,

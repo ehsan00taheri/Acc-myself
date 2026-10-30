@@ -11,7 +11,7 @@ import {
   FileJson,
   ShieldCheck,
 } from 'lucide-react';
-import { Transaction } from '../types';
+import { Transaction, CustomCategory } from '../types';
 import { exportBackupJSON, exportToCSV, importBackupJSON } from '../services/storage';
 import { toPersianDigits } from '../utils/persian';
 
@@ -20,6 +20,8 @@ interface BackupManagerModalProps {
   onClose: () => void;
   transactions: Transaction[];
   onImportTransactions: (imported: Transaction[], mode: 'replace' | 'merge') => void;
+  customCategories?: CustomCategory[];
+  onImportCustomCategories?: (categories: CustomCategory[]) => void;
 }
 
 export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
@@ -27,6 +29,8 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
   onClose,
   transactions,
   onImportTransactions,
+  customCategories = [],
+  onImportCustomCategories,
 }) => {
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge');
@@ -36,9 +40,9 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
 
   const handleExportJSON = () => {
     try {
-      exportBackupJSON(transactions);
+      exportBackupJSON(transactions, customCategories);
       setStatusMessage({
-        text: `فایل پشتیبان JSON شامل ${toPersianDigits(transactions.length)} تراکنش دانلود شد. می‌توانید آن را در Google Drive خود ذخیره کنید.`,
+        text: `فایل پشتیبان JSON شامل ${toPersianDigits(transactions.length)} تراکنش و ${toPersianDigits(customCategories.length)} دسته‌بندی شخصی دانلود شد.`,
         type: 'success',
       });
     } catch (e: any) {
@@ -63,12 +67,15 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
     if (!file) return;
 
     try {
-      const imported = await importBackupJSON(file);
-      onImportTransactions(imported, importMode);
+      const result = await importBackupJSON(file);
+      onImportTransactions(result.transactions, importMode);
+      if (result.customCategories && onImportCustomCategories) {
+        onImportCustomCategories(result.customCategories);
+      }
       setStatusMessage({
-        text: `تعداد ${toPersianDigits(imported.length)} تراکنش با موفقیت ${
-          importMode === 'merge' ? 'ادغام شد' : 'جایگزین شد'
-        }.`,
+        text: `تعداد ${toPersianDigits(result.transactions.length)} تراکنش ${
+          result.customCategories ? `و ${toPersianDigits(result.customCategories.length)} دسته‌بندی شخصی ` : ''
+        }با موفقیت ${importMode === 'merge' ? 'ادغام شد' : 'جایگزین شد'}.`,
         type: 'success',
       });
       if (fileInputRef.current) fileInputRef.current.value = '';

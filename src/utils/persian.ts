@@ -50,6 +50,8 @@ export function getFullPersianDateHeader(): string {
   }
 }
 
+import { Transaction, CustomCategory } from '../types';
+
 // پیکربندی دسته‌بندی‌ها به همراه رنگ و استایل
 export interface CategoryConfig {
   name: string;
@@ -59,6 +61,106 @@ export interface CategoryConfig {
   badgeClass: string;
   chartColor: string;
 }
+
+// دسته‌بندی‌های پیش‌فرض سیستم برای هزینه و درآمد
+export const DEFAULT_CATEGORIES: CustomCategory[] = [
+  {
+    id: 'def-food',
+    name: 'خوراک و نوشیدنی',
+    type: 'expense',
+    iconName: 'Utensils',
+    color: '#f59e0b',
+    isCustom: false,
+  },
+  {
+    id: 'def-transport',
+    name: 'حمل‌ونقل',
+    type: 'expense',
+    iconName: 'Car',
+    color: '#0284c7',
+    isCustom: false,
+  },
+  {
+    id: 'def-home',
+    name: 'مسکن و قبوض',
+    type: 'expense',
+    iconName: 'Home',
+    color: '#9333ea',
+    isCustom: false,
+  },
+  {
+    id: 'def-shopping',
+    name: 'خرید و پوشاک',
+    type: 'expense',
+    iconName: 'ShoppingBag',
+    color: '#db2777',
+    isCustom: false,
+  },
+  {
+    id: 'def-health',
+    name: 'سلامت و درمان',
+    type: 'expense',
+    iconName: 'HeartPulse',
+    color: '#e11d48',
+    isCustom: false,
+  },
+  {
+    id: 'def-entertainment',
+    name: 'تفریح و سرگرمی',
+    type: 'expense',
+    iconName: 'Sparkles',
+    color: '#6366f1',
+    isCustom: false,
+  },
+  {
+    id: 'def-education',
+    name: 'آموزش و کتاب',
+    type: 'expense',
+    iconName: 'BookOpen',
+    color: '#0d9488',
+    isCustom: false,
+  },
+  {
+    id: 'def-salary',
+    name: 'حقوق و دستمزد',
+    type: 'income',
+    iconName: 'Wallet',
+    color: '#10b981',
+    isCustom: false,
+  },
+  {
+    id: 'def-invest',
+    name: 'سرمایه‌گذاری و پس‌انداز',
+    type: 'both',
+    iconName: 'TrendingUp',
+    color: '#059669',
+    isCustom: false,
+  },
+  {
+    id: 'def-gift',
+    name: 'پاداش و هدیه',
+    type: 'income',
+    iconName: 'Gift',
+    color: '#8b5cf6',
+    isCustom: false,
+  },
+  {
+    id: 'def-business',
+    name: 'فروش و تجارت',
+    type: 'income',
+    iconName: 'Briefcase',
+    color: '#2563eb',
+    isCustom: false,
+  },
+  {
+    id: 'def-other',
+    name: 'سایر',
+    type: 'both',
+    iconName: 'Receipt',
+    color: '#64748b',
+    isCustom: false,
+  },
+];
 
 export const CATEGORY_STYLES: Record<string, CategoryConfig> = {
   'خوراک و نوشیدنی': {
@@ -133,6 +235,22 @@ export const CATEGORY_STYLES: Record<string, CategoryConfig> = {
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     chartColor: '#059669',
   },
+  'پاداش و هدیه': {
+    name: 'پاداش و هدیه',
+    iconName: 'Gift',
+    bgClass: 'bg-purple-100',
+    textClass: 'text-purple-800',
+    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+    chartColor: '#8b5cf6',
+  },
+  'فروش و تجارت': {
+    name: 'فروش و تجارت',
+    iconName: 'Briefcase',
+    bgClass: 'bg-blue-100',
+    textClass: 'text-blue-800',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    chartColor: '#2563eb',
+  },
   'سایر': {
     name: 'سایر',
     iconName: 'Receipt',
@@ -143,20 +261,51 @@ export const CATEGORY_STYLES: Record<string, CategoryConfig> = {
   },
 };
 
-// دریافت اطلاعات استایل یک دسته‌بندی با مقدار پیش‌فرض مطمئن
-export function getCategoryStyle(categoryName: string): CategoryConfig {
-  if (CATEGORY_STYLES[categoryName]) {
-    return CATEGORY_STYLES[categoryName];
+// دریافت اطلاعات استایل یک دسته‌بندی با بررسی دسته‌های سفارشی
+export function getCategoryStyle(
+  categoryName: string,
+  customCategories?: CustomCategory[]
+): CategoryConfig {
+  const trimmed = (categoryName || '').trim();
+
+  // ۱. بررسی در دسته‌بندی‌های شخصی کاربر
+  if (customCategories && customCategories.length > 0) {
+    const found = customCategories.find(
+      (c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (found) {
+      return {
+        name: found.name,
+        iconName: found.iconName || 'Tag',
+        bgClass: 'bg-slate-100',
+        textClass: 'text-slate-800',
+        badgeClass: 'bg-slate-50 text-slate-700 border-slate-300',
+        chartColor: found.color || '#6366f1',
+      };
+    }
   }
-  
-  // جستجوی تقریبی در صورت تشابه نام
+
+  // ۲. بررسی در دسته‌بندی‌های استاتیک
+  if (CATEGORY_STYLES[trimmed]) {
+    return CATEGORY_STYLES[trimmed];
+  }
+
+  // ۳. جستجوی تقریبی در دسته‌های استاتیک
   for (const key of Object.keys(CATEGORY_STYLES)) {
-    if (categoryName.includes(key) || key.includes(categoryName)) {
+    if (trimmed.includes(key) || key.includes(trimmed)) {
       return CATEGORY_STYLES[key];
     }
   }
-  
-  return CATEGORY_STYLES['سایر'];
+
+  // ۴. مقدار پیش‌فرض
+  return {
+    name: trimmed || 'سایر',
+    iconName: 'Tag',
+    bgClass: 'bg-slate-100',
+    textClass: 'text-slate-800',
+    badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
+    chartColor: '#64748b',
+  };
 }
 
 // لیست حساب‌های پیش‌فرض برای انتخاب سریع
@@ -170,50 +319,5 @@ export const DEFAULT_ACCOUNTS = [
   'نقدی / کیف پول',
 ];
 
-// تراکنش‌های نمونه اولیه برای بار اول کاربر
-export const INITIAL_TRANSACTIONS = [
-  {
-    id: 'init-1',
-    title: 'حقوق ماهانه',
-    amount: 18500000,
-    type: 'income' as const,
-    category: 'حقوق و دستمزد',
-    account: 'حساب بانک ملت',
-    persianDate: getCurrentPersianDate(),
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    rawText: 'واریز حقوق ماهانه ۱۸ میلیون و ۵۰۰ هزار تومان به بانک ملت',
-  },
-  {
-    id: 'init-2',
-    title: 'خرید هفتگی سوپرمارکت',
-    amount: 680000,
-    type: 'expense' as const,
-    category: 'خوراک و نوشیدنی',
-    account: 'کارت بانک ملی',
-    persianDate: getCurrentPersianDate(),
-    createdAt: Date.now() - 1000 * 60 * 60 * 18,
-    rawText: 'خرید از سوپرمارکت و میوه‌فروشی ۶۸۰ هزار تومن با کارت ملی',
-  },
-  {
-    id: 'init-3',
-    title: 'کرایه تاکسی اینترنتی',
-    amount: 45000,
-    type: 'expense' as const,
-    category: 'حمل‌ونقل',
-    account: 'بلو بانک',
-    persianDate: getCurrentPersianDate(),
-    createdAt: Date.now() - 1000 * 60 * 60 * 4,
-    rawText: 'امروز کرایه اسنپ تا شرکت ۴۵ هزار تومان با بلو بانک',
-  },
-  {
-    id: 'init-4',
-    title: 'کافه با دوستان',
-    amount: 180000,
-    type: 'expense' as const,
-    category: 'تفریح و سرگرمی',
-    account: 'کارت اصلی',
-    persianDate: getCurrentPersianDate(),
-    createdAt: Date.now() - 1000 * 60 * 60 * 2,
-    rawText: 'کافه و قهوه با دوستان ۱۸۰ هزار تومان',
-  },
-];
+// تراکنش‌های اولیه خالی برای شروع پاک و بدون اطلاعات تستی
+export const INITIAL_TRANSACTIONS: Transaction[] = [];

@@ -1,8 +1,8 @@
 /**
- * ماژول تعامل با Google Drive API v3 جهت ذخیره، همگام‌سازی و خواندن تراکنش‌ها
+ * ماژول تعامل با Google Drive API v3 جهت ذخیره، همگام‌سازی و خواندن تراکنش‌ها و دسته‌بندی‌ها
  */
 
-import { Transaction } from '../types';
+import { Transaction, CustomCategory } from '../types';
 
 export const DRIVE_FILENAME = 'hesabdari_personal_finance.json';
 
@@ -19,6 +19,7 @@ export interface DriveStoragePayload {
   updatedAt: string;
   userEmail?: string;
   transactions: Transaction[];
+  customCategories?: CustomCategory[];
 }
 
 /**
@@ -58,7 +59,11 @@ export async function findDatabaseFileOnDrive(accessToken: string): Promise<Driv
 export async function loadDatabaseFromDrive(
   accessToken: string,
   fileId: string
-): Promise<{ transactions: Transaction[]; modifiedTime?: string }> {
+): Promise<{
+  transactions: Transaction[];
+  customCategories?: CustomCategory[];
+  modifiedTime?: string;
+}> {
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
     {
@@ -75,13 +80,20 @@ export async function loadDatabaseFromDrive(
 
   const json = await response.json();
   let list: Transaction[] = [];
+  let categories: CustomCategory[] = [];
 
   if (Array.isArray(json)) {
     list = json;
-  } else if (json && Array.isArray(json.transactions)) {
-    list = json.transactions;
-  } else if (json && Array.isArray(json.data)) {
-    list = json.data;
+  } else if (json && typeof json === 'object') {
+    if (Array.isArray(json.transactions)) {
+      list = json.transactions;
+    } else if (Array.isArray(json.data)) {
+      list = json.data;
+    }
+
+    if (Array.isArray(json.customCategories)) {
+      categories = json.customCategories;
+    }
   }
 
   // اعتبارسنجی اولیه ساختار تراکنش‌ها
@@ -91,25 +103,28 @@ export async function loadDatabaseFromDrive(
 
   return {
     transactions: validList,
+    customCategories: categories.length > 0 ? categories : undefined,
     modifiedTime: json?.updatedAt,
   };
 }
 
 /**
- * ذخیره یا به‌روزرسانی فایل تراکنش‌ها در گوگل درایو
+ * ذخیره یا به‌روزرسانی فایل تراکنش‌ها و دسته‌بندی‌ها در گوگل درایو
  */
 export async function saveDatabaseToDrive(
   accessToken: string,
   transactions: Transaction[],
   existingFileId?: string | null,
-  userEmail?: string
+  userEmail?: string,
+  customCategories?: CustomCategory[]
 ): Promise<{ fileId: string; modifiedTime: string }> {
   const payload: DriveStoragePayload = {
     app: 'hesabdari-smart-pwa',
-    version: '2.5.0',
+    version: '2.6.0',
     updatedAt: new Date().toISOString(),
     userEmail: userEmail || undefined,
     transactions,
+    customCategories: customCategories || [],
   };
 
   const content = JSON.stringify(payload, null, 2);
@@ -143,7 +158,7 @@ export async function saveDatabaseToDrive(
   const metadata = {
     name: DRIVE_FILENAME,
     mimeType: 'application/json',
-    description: 'دیتابیس پشتیبان تراکنش‌های حسابداری شخصی هوشمند',
+    description: 'دیتابیس پشتیبان تراکنش‌ها و دسته‌بندی‌های حسابداری شخصی هوشمند',
   };
 
   const boundary = '-------314159265358979323846';

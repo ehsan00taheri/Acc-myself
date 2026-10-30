@@ -1,13 +1,13 @@
 /**
- * ماژول مدیریت حافظه، پشتیبان‌گیری، خروجی اکسل/CSV و ذخیره‌سازی داده‌ها
- * این لایه به گونه‌ای طراحی شده که در آینده به سادگی به دیتابیس ابری یا Google Drive متصل شود.
+ * ماژول مدیریت حافظه، پشتیبان‌گیری، خروجی اکسل/CSV و ذخیره‌سازی داده‌ها و دسته‌بندی‌ها
  */
 
-import { Transaction } from '../types';
+import { Transaction, CustomCategory } from '../types';
 
 export const STORAGE_KEY = 'smart_accounting_transactions_v2';
+export const CATEGORIES_STORAGE_KEY = 'smart_accounting_custom_categories_v1';
 
-// ذخیره‌سازی در LocalStorage
+// ذخیره‌سازی تراکنش‌ها در LocalStorage
 export function saveTransactions(transactions: Transaction[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
@@ -16,14 +16,18 @@ export function saveTransactions(transactions: Transaction[]): void {
   }
 }
 
-// بارگذاری از LocalStorage
+// بارگذاری تراکنش‌ها از LocalStorage (با پالایش خودکار داده‌های تستی اولیه)
 export function loadTransactions(): Transaction[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      // حذف خودکار تمام داده‌های تستی قدیمی با شناسه init-
+      const cleanList = parsed.filter(
+        (t) => t && typeof t === 'object' && !String(t.id || '').startsWith('init-')
+      );
+      return cleanList;
     }
   } catch (error) {
     console.error('خطا در خواندن داده‌ها از حافظه:', error);
@@ -31,23 +35,52 @@ export function loadTransactions(): Transaction[] | null {
   return null;
 }
 
+// ذخیره‌سازی دسته‌بندی‌های شخصی در LocalStorage
+export function saveCustomCategories(categories: CustomCategory[]): void {
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+  } catch (error) {
+    console.error('خطا در ذخیره‌سازی دسته‌بندی‌های شخصی:', error);
+  }
+}
+
+// بارگذاری دسته‌بندی‌های شخصی از LocalStorage
+export function loadCustomCategories(): CustomCategory[] | null {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('خطا در خواندن دسته‌بندی‌ها از حافظه:', error);
+  }
+  return null;
+}
+
 // خروجی پشتیبان به صورت فایل JSON برای ذخیره در Google Drive یا دستگاه کاربر
-export function exportBackupJSON(transactions: Transaction[]): void {
+export function exportBackupJSON(
+  transactions: Transaction[],
+  customCategories?: CustomCategory[]
+): void {
   const exportData = {
     appName: 'حسابداری شخصی هوشمند',
-    version: '2.0.0',
+    version: '2.1.0',
     exportDate: new Date().toISOString(),
     transactionsCount: transactions.length,
+    customCategoriesCount: (customCategories || []).length,
+    customCategories: customCategories || [],
     data: transactions,
   };
 
   const jsonString = JSON.stringify(exportData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  
+
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  
+
   const link = document.createElement('a');
   link.href = url;
   link.download = `hesabdari-backup-${dateStr}.json`;
@@ -59,8 +92,18 @@ export function exportBackupJSON(transactions: Transaction[]): void {
 
 // خروجی اکسل / CSV با پشتیبانی کامل از حروف فارسی (UTF-8 with BOM)
 export function exportToCSV(transactions: Transaction[]): void {
-  const headers = ['ردیف', 'عنوان تراکنش', 'مبلغ (تومان)', 'نوع', 'دسته‌بندی', 'حساب / کارت', 'تاریخ', 'متن اولیه', 'توضیحات'];
-  
+  const headers = [
+    'ردیف',
+    'عنوان تراکنش',
+    'مبلغ (تومان)',
+    'نوع',
+    'دسته‌بندی',
+    'حساب / کارت',
+    'تاریخ',
+    'متن اولیه',
+    'توضیحات',
+  ];
+
   const rows = transactions.map((tx, idx) => [
     idx + 1,
     `"${(tx.title || '').replace(/"/g, '""')}"`,
@@ -73,7 +116,8 @@ export function exportToCSV(transactions: Transaction[]): void {
     `"${(tx.note || '').replace(/"/g, '""')}"`,
   ]);
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+  const csvContent =
+    '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
@@ -89,34 +133,55 @@ export function exportToCSV(transactions: Transaction[]): void {
   URL.revokeObjectURL(url);
 }
 
+export interface ImportResult {
+  transactions: Transaction[];
+  customCategories?: CustomCategory[];
+}
+
 // خواندن و اعتبارسنجی فایل پشتیبان JSON
-export function importBackupJSON(file: File): Promise<Transaction[]> {
+export function importBackupJSON(file: File): Promise<ImportResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
-        
+
         let txList: Transaction[] = [];
+        let categories: CustomCategory[] = [];
+
         if (Array.isArray(parsed)) {
           txList = parsed;
-        } else if (parsed && Array.isArray(parsed.data)) {
-          txList = parsed.data;
+        } else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.data)) {
+            txList = parsed.data;
+          } else if (Array.isArray(parsed.transactions)) {
+            txList = parsed.transactions;
+          }
+
+          if (Array.isArray(parsed.customCategories)) {
+            categories = parsed.customCategories;
+          }
         } else {
           throw new Error('ساختار فایل پشتیبان معتبر نیست.');
         }
 
         // اعتبارسنجی فیلدهای ضروری
         const validated = txList.filter(
-          (t) => t && typeof t.amount === 'number' && (t.type === 'expense' || t.type === 'income')
+          (t) =>
+            t &&
+            typeof t.amount === 'number' &&
+            (t.type === 'expense' || t.type === 'income')
         );
 
         if (validated.length === 0) {
           throw new Error('هیچ تراکنش معتبری در فایل یافت نشد.');
         }
 
-        resolve(validated);
+        resolve({
+          transactions: validated,
+          customCategories: categories.length > 0 ? categories : undefined,
+        });
       } catch (err: any) {
         reject(err.message || 'خطا در خواندن فایل پشتیبان.');
       }

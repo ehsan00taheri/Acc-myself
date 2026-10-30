@@ -7,6 +7,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// HMR is disabled in AI Studio dev environment to prevent WebSocket transport errors in preview iframe
+if (process.env.DISABLE_HMR === undefined) {
+  process.env.DISABLE_HMR = "true";
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -39,7 +44,7 @@ app.get("/api/health", (req, res) => {
 // مسیر پردازش هوشمند متن تراکنش با جمینای
 app.post("/api/parse-transaction", async (req, res) => {
   try {
-    const { text, referenceDate } = req.body;
+    const { text, referenceDate, availableCategories } = req.body;
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return res.status(400).json({
@@ -58,6 +63,24 @@ app.post("/api/parse-transaction", async (req, res) => {
       day: "2-digit",
     }).format(now);
 
+    const categoriesListText =
+      Array.isArray(availableCategories) && availableCategories.length > 0
+        ? `لیست دسته‌بندی‌های فعال و شخصی کاربر (حتماً از بین این موارد یا مناسب‌ترین دسته‌بندی انتخاب کن):\n` +
+          availableCategories.map((c: string) => `   - '${c}'`).join("\n")
+        : `دسته‌بندی‌های استاندارد:\n` +
+          `   - 'خوراک و نوشیدنی'\n` +
+          `   - 'حمل‌ونقل'\n` +
+          `   - 'مسکن و قبوض'\n` +
+          `   - 'خرید و پوشاک'\n` +
+          `   - 'سلامت و درمان'\n` +
+          `   - 'تفریح و سرگرمی'\n` +
+          `   - 'آموزش و کتاب'\n` +
+          `   - 'حقوق و دستمزد'\n` +
+          `   - 'سرمایه‌گذاری و پس‌انداز'\n` +
+          `   - 'پاداش و هدیه'\n` +
+          `   - 'فروش و تجارت'\n` +
+          `   - 'سایر'`;
+
     const systemInstruction = `شما یک دستیار هوشمند و فوق‌العاده دقیق برای استخراج و ثبت تراکنش‌های مالی و حسابداری شخصی به زبان فارسی هستید.
 وظیفه شما تبدیل جملات طبیعی کاربر به یک تراکنش ساختاریافته مالی به همراه دسته‌بندی و حسابی که از آن پرداخت/دریافت شده است می‌باشد.
 
@@ -75,17 +98,8 @@ app.post("/api/parse-transaction", async (req, res) => {
    - 'income' برای درآمدها، حقوق، دستمزد، واریز، پاداش، هدیه نقدی، فروش، سود و ...
 
 ۳. دسته‌بندی (category):
-   یکی از دسته‌بندی‌های استاندارد زیر را بر اساس مفهوم جمله انتخاب کن:
-   - 'خوراک و نوشیدنی' (غذا، ناهار، شام، صبحانه، کافه، رستوران، میوه، نان، سوپرمارکت)
-   - 'حمل‌ونقل' (تاکسی، اسنپ، تپسی، مترو، بنزین، تعمیر خودرو، اتوبوس)
-   - 'مسکن و قبوض' (اجاره، شارژ ساختمان، قبض آب/برق/گاز/تلفن، اینترنت)
-   - 'خرید و پوشاک' (لباس، کفش، لوازم شخصی، خرید آنلاین، ابزار)
-   - 'سلامت و درمان' (دکتر، داروخانه، دندانپزشکی، آزمایش، ویزیت)
-   - 'تفریح و سرگرمی' (سینما، سفر، بازی، کنسرت، ورزش، تفریح)
-   - 'آموزش و کتاب' (کتاب، دوره آموزشی، شهریه، دانشگاه)
-   - 'حقوق و دستمزد' (حقوق ماهانه، پاداش، اضافه‌کاری، دستمزد پروژه)
-   - 'سرمایه‌گذاری و پس‌انداز' (خرید طلا، سهام، رمزارز، سود سپرده، پس‌انداز)
-   - 'سایر' (اگر در دسته‌های فوق جا نگرفت)
+   بر اساس مفهوم جمله و لیست دسته‌های زیر، دقیق‌ترین دسته‌بندی را انتخاب کن (اگر کاربر دسته شخصی مرتبطی مانند «باشگاه»، «پت»، «اقساط» و... دارد، آن را ترجیح بده):
+${categoriesListText}
 
 ۴. حساب پرداخت‌کننده یا دریافت‌کننده (account):
    - اگر کاربر به نام بانک یا حساب اشاره کرد (مانند «کارت ملی»، «بانک ملت»، «بلو بانک»، «سامان»، «پاسارگاد»، «تجارت»، «صادرات»، «نقدی»، «کیف پول»)، نام آن را تمیز استخراج کن (مثلا: "کارت بانک ملی"، "حساب بانک ملت"، "بلو بانک"، "نقدی").
@@ -171,8 +185,13 @@ app.post("/api/parse-transaction", async (req, res) => {
 // راه‌اندازی میدل‌ویر Vite در حالت توسعه یا فایل‌های استاتیک در حالت پروداکشن
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const isHmrDisabled = process.env.DISABLE_HMR === "true";
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: isHmrDisabled ? false : undefined,
+        watch: isHmrDisabled ? null : {},
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

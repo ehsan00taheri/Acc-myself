@@ -20,6 +20,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      // Gracefully handle harmless WebSocket / HMR transport disconnects in preview iframe
+      window.addEventListener('error', function(event) {
+        if (
+          event.message &&
+          (event.message.includes('WebSocket') ||
+           event.message.includes('createWebSocketModuleRunnerTransport') ||
+           (event.filename && event.filename.includes('@vite/client')))
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(event) {
+        var msg = (event.reason && (event.reason.message || String(event.reason))) || '';
+        if (
+          msg.includes('WebSocket') ||
+          msg.includes('createWebSocketModuleRunnerTransport') ||
+          (event.reason && event.reason.stack && event.reason.stack.includes('@vite/client'))
+        ) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+        }
+      }, true);
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white font-sans min-h-screen">
     <div id="root"></div>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { WalletCards, RotateCcw, Calendar, HardDrive, CloudCheck } from 'lucide-react';
+import { WalletCards, RotateCcw, Calendar, HardDrive, CloudCheck, Tag } from 'lucide-react';
 import { getFullPersianDateHeader, toPersianDigits } from '../utils/persian';
 
 interface HeaderProps {
   transactionCount: number;
   onResetData: () => void;
   onOpenBackupModal: () => void;
+  onOpenCategoryModal?: () => void;
   userEmail?: string | null;
 }
 
@@ -16,12 +17,13 @@ export const Header: React.FC<HeaderProps> = ({
   transactionCount,
   onResetData,
   onOpenBackupModal,
+  onOpenCategoryModal,
   userEmail,
 }) => {
   const currentDate = getFullPersianDateHeader();
 
   const handleReset = () => {
-    if (window.confirm('آیا از پاک کردن تمامی تراکنش‌ها و بازگرداندن داده‌های اولیه اطمینان دارید؟')) {
+    if (window.confirm('آیا از پاک‌سازی تمامی تراکنش‌ها و شروع مجدد با لیست خالی اطمینان دارید؟')) {
       onResetData();
     }
   };
@@ -70,6 +72,19 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{currentDate}</span>
           </div>
 
+          {/* دکمه مدیریت دسته‌بندی‌ها */}
+          {onOpenCategoryModal && (
+            <button
+              id="category-manager-btn"
+              onClick={onOpenCategoryModal}
+              title="مدیریت دسته‌بندی‌های شخصی و پیش‌فرض"
+              className="flex items-center gap-1.5 text-xs text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer font-medium"
+            >
+              <Tag className="w-3.5 h-3.5 text-indigo-600" />
+              <span>دسته‌بندی‌ها</span>
+            </button>
+          )}
+
           {/* دکمه پشتیبان‌گیری و انتقال داده‌ها */}
           <button
             id="backup-manager-btn"
@@ -78,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer font-medium"
           >
             <HardDrive className="w-3.5 h-3.5 text-indigo-600" />
-            <span>پشتیبان‌گیری / خروجی</span>
+            <span>پشتیبان‌گیری</span>
           </button>
 
           <button

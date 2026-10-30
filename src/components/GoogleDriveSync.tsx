@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import {
   Cloud,
@@ -12,6 +12,11 @@ import {
   Shield,
   Loader2,
   Sparkles,
+  Smartphone,
+  HelpCircle,
+  HardDrive,
+  Check,
+  X,
 } from 'lucide-react';
 import { googleSignIn, googleSignOut } from '../services/driveAuth';
 import {
@@ -20,7 +25,7 @@ import {
   saveDatabaseToDrive,
   DriveFileInfo,
 } from '../services/googleDrive';
-import { Transaction } from '../types';
+import { Transaction, CustomCategory } from '../types';
 import { toPersianDigits, formatPersianCurrency } from '../utils/persian';
 
 interface GoogleDriveSyncProps {
@@ -30,6 +35,8 @@ interface GoogleDriveSyncProps {
   onAuthSignOut: () => void;
   transactions: Transaction[];
   onUpdateTransactionsFromDrive: (transactions: Transaction[]) => void;
+  customCategories?: CustomCategory[];
+  onUpdateCategoriesFromDrive?: (categories: CustomCategory[]) => void;
 }
 
 export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
@@ -39,12 +46,67 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
   onAuthSignOut,
   transactions,
   onUpdateTransactionsFromDrive,
+  customCategories = [],
+  onUpdateCategoriesFromDrive,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [driveFile, setDriveFile] = useState<DriveFileInfo | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [showMobileGuide, setShowMobileGuide] = useState(false);
+
+  // وضعیت همگام‌سازی خودکار در گوگل درایو
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    return localStorage.getItem('smart_accounting_auto_sync') !== 'false';
+  });
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const isInitialMount = useRef(true);
+
+  // تغییر وضعیت همگام‌سازی خودکار
+  const toggleAutoSync = () => {
+    const nextVal = !autoSync;
+    setAutoSync(nextVal);
+    localStorage.setItem('smart_accounting_auto_sync', String(nextVal));
+  };
+
+  // همگام‌سازی خودکار در پس‌زمینه با هر تغییر تراکنش‌ها یا دسته‌بندی‌ها
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (!autoSync || !accessToken || !user || isSyncing) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        const result = await saveDatabaseToDrive(
+          accessToken,
+          transactions,
+          driveFile?.id,
+          user.email || undefined,
+          customCategories
+        );
+        setDriveFile((prev) => ({
+          id: result.fileId,
+          name: 'hesabdari_personal_finance.json',
+          modifiedTime: result.modifiedTime,
+        }));
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        setLastSyncTime(timeStr);
+      } catch (e) {
+        console.warn('Auto backup to drive error:', e);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [transactions, customCategories, autoSync, accessToken, user]);
 
   // دیالوگ تأیید برای عملیات جایگزینی (الزام قوانین Workspace برای عملیات بازنویسی)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -129,7 +191,8 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         accessToken,
         transactions,
         driveFile?.id,
-        user?.email || undefined
+        user?.email || undefined,
+        customCategories
       );
 
       setDriveFile((prev) => ({
@@ -144,7 +207,9 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
       setFeedback({
         type: 'success',
-        text: `تعداد ${toPersianDigits(transactions.length)} تراکنش با موفقیت در دیتابیس Google Drive ایمیل شما ذخیره شد.`,
+        text: `تعداد ${toPersianDigits(transactions.length)} تراکنش ${
+          customCategories.length > 0 ? `و ${toPersianDigits(customCategories.length)} دسته‌بندی شخصی ` : ''
+        }با موفقیت در دیتابیس Google Drive ایمیل شما ذخیره شد.`,
       });
     } catch (err: any) {
       setFeedback({
@@ -184,9 +249,13 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         setDriveFile(file);
       }
 
-      const { transactions: driveTransactions } = await loadDatabaseFromDrive(accessToken, targetFileId);
+      const { transactions: driveTransactions, customCategories: driveCategories } =
+        await loadDatabaseFromDrive(accessToken, targetFileId);
 
       onUpdateTransactionsFromDrive(driveTransactions);
+      if (driveCategories && onUpdateCategoriesFromDrive) {
+        onUpdateCategoriesFromDrive(driveCategories);
+      }
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -194,7 +263,9 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
       setFeedback({
         type: 'success',
-        text: `دیتابیس از Google Drive بارگذاری شد (${toPersianDigits(driveTransactions.length)} تراکنش جایگزین گردید).`,
+        text: `دیتابیس از Google Drive بارگذاری شد (${toPersianDigits(driveTransactions.length)} تراکنش ${
+          driveCategories ? `و ${toPersianDigits(driveCategories.length)} دسته شخصی ` : ''
+        }همگام شد).`,
       });
     } catch (err: any) {
       setFeedback({
@@ -215,19 +286,27 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
             <Cloud className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-bold text-slate-800">
                 همگام‌سازی ابری با Google Drive
               </h2>
-              {user && (
+              {user ? (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                   <span>متصل به حساب</span>
                 </span>
-              )}
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setShowMobileGuide((prev) => !prev)}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium transition cursor-pointer"
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>راهنمای اجرا روی گوشی</span>
+              </button>
             </div>
-            <p className="text-[11px] text-slate-500">
-              ذخیره دائمی تراکنش‌ها روی Google Drive ایمیل شما بدون نیاز به دیتابیس جانبی
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              ذخیره دائمی روی Google Drive ایمیل شما + ثبت مطمئن در حافظه آفلاین گوشی
             </p>
           </div>
         </div>
@@ -262,6 +341,42 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
           </div>
         )}
       </div>
+
+      {/* راهنمای گام‌به‌گام راه‌اندازی و استفاده روی گوشی تلفن همراه */}
+      {showMobileGuide && (
+        <div className="mt-3 p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-xl text-xs text-indigo-950 space-y-2.5 animate-fade-in">
+          <div className="flex items-center justify-between font-bold text-indigo-900 border-b border-indigo-200/60 pb-2">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-indigo-600" />
+              <span>چرا بار قبلی روی گوشی اجرا نشد و چطور تست کنیم؟</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMobileGuide(false)}
+              className="p-1 hover:bg-indigo-100 rounded-lg text-indigo-600 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="leading-relaxed text-indigo-900/90 text-[11px]">
+            لینک‌های پیش‌نمایش توسعه (<code className="font-mono bg-indigo-100/70 px-1 py-0.5 rounded">ais-dev-...</code>) تنها برای کاربری که در استودیو لاگین است مجاز بوده و روی گوشی باز نمی‌شوند. برای اجرای کامل روی گوشی:
+          </p>
+          <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed text-indigo-950 pr-1">
+            <li>
+              <strong>انتشار اپلیکیشن:</strong> روی دکمه آبی <strong>Publish</strong> یا <strong>Share</strong> در گوشه بالای پنل کلیک نمایید.
+            </li>
+            <li>
+              <strong>لینک عمومی (Shared App URL):</strong> لینک ایجاد‌شده (مثلاً <code className="font-mono bg-indigo-100/70 px-1 py-0.5 rounded">ais-pre-...</code>) را کپی کرده و در مرورگر گوشی (Chrome یا Safari) باز کنید.
+            </li>
+            <li>
+              <strong>ذخیره در حافظه گوشی:</strong> هر تراکنشی که ثبت کنید درجا داخل حافظه آفلاین گوشی (LocalStorage) ذخیره می‌شود و حتی با قطع اینترنت باقی می‌ماند.
+            </li>
+            <li>
+              <strong>بکاپ در گوگل درایو:</strong> با زدن دکمه «ورود با حساب گوگل (Drive)»، دیتابیس به صورت خودکار با درایو ایمیل شخصی شما همگام می‌گردد.
+            </li>
+          </ol>
+        </div>
+      )}
 
       {/* اعلان‌های وضعیت */}
       {feedback && (
@@ -399,17 +514,43 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
             </button>
           </div>
 
-          {/* وضعیت فایل و آخرین همگام‌سازی */}
-          <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <div className="flex items-center gap-1.5">
-              <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>نام فایل در درایو: <code className="font-mono text-slate-700 font-bold">hesabdari_personal_finance.json</code></span>
-            </div>
-            {lastSyncTime && (
-              <div className="text-slate-400">
-                آخرین همگام‌سازی: ساعت {toPersianDigits(lastSyncTime)}
+          {/* ردیف وضعیت همگام‌سازی خودکار و فایل درایو */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-600 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200/70">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>فایل: <code className="font-mono text-slate-800 font-bold">hesabdari_personal_finance.json</code></span>
               </div>
-            )}
+              {lastSyncTime && (
+                <span className="text-slate-400">
+                  (آخرین همگام‌سازی: ساعت {toPersianDigits(lastSyncTime)})
+                </span>
+              )}
+            </div>
+
+            {/* کنترل و نشانگر همگام‌سازی خودکار */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {isAutoSaving && (
+                <span className="flex items-center gap-1 text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full font-medium animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>درحال ثبت خودکار در درایو...</span>
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={toggleAutoSync}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition cursor-pointer ${
+                  autoSync
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                    : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200'
+                }`}
+                title="تغییر وضعیت همگام‌سازی خودکار پس از هر تراکنش"
+              >
+                <RefreshCw className={`w-3 h-3 ${autoSync ? 'text-emerald-600' : 'text-slate-400'}`} />
+                <span>پشتیبان‌گیری خودکار: {autoSync ? 'فعال' : 'غیرفعال'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
