@@ -6,7 +6,7 @@ import {
   Edit2,
   Tag,
 } from 'lucide-react';
-import { Transaction, FilterType, CustomCategory } from '../types';
+import { Transaction, FilterType, CustomCategory, Account } from '../types';
 import {
   formatPersianCurrency,
   toPersianDigits,
@@ -22,6 +22,9 @@ interface TransactionListProps {
   onEditTransaction: (tx: Transaction) => void;
   customCategories?: CustomCategory[];
   onOpenCategoryManager?: () => void;
+  accounts?: Account[];
+  selectedAccountFilter?: string;
+  onClearAccountFilter?: () => void;
 }
 
 /**
@@ -35,13 +38,26 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   onEditTransaction,
   customCategories = [],
   onOpenCategoryManager,
+  accounts = [],
+  selectedAccountFilter = 'all',
+  onClearAccountFilter,
 }) => {
-  // فیلتر کردن تراکنش‌ها
+  // فیلتر کردن تراکنش‌ها بر اساس نوع و حساب انتخابی
   const filteredTransactions = transactions.filter((tx) => {
-    if (filter === 'expense') return tx.type === 'expense';
-    if (filter === 'income') return tx.type === 'income';
+    if (filter === 'expense' && tx.type !== 'expense') return false;
+    if (filter === 'income' && tx.type !== 'income') return false;
+    if (
+      selectedAccountFilter !== 'all' &&
+      (tx.account || '').trim().toLowerCase() !== selectedAccountFilter.trim().toLowerCase()
+    ) {
+      return false;
+    }
     return true;
   });
+
+  // نقشه حساب‌ها برای رنگ کارت در برچسب
+  const accountMap = new Map<string, Account>();
+  accounts.forEach((a) => accountMap.set(a.name.trim().toLowerCase(), a));
 
   // مرتب‌سازی بر اساس جدیدترین زمان ایجاد در بالا
   const sortedTransactions = [...filteredTransactions].sort(
@@ -163,9 +179,34 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                         {tx.title}
                       </h3>
                       {/* برچسب حساب بانکی یا کارت */}
-                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80 font-medium">
-                        <span>{tx.account || 'کارت اصلی'}</span>
-                      </span>
+                      {(() => {
+                        const accName = tx.account || 'کارت اصلی';
+                        const matchedAcc = accountMap.get(accName.trim().toLowerCase());
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md border font-medium"
+                            style={
+                              matchedAcc?.color
+                                ? {
+                                    backgroundColor: `${matchedAcc.color}12`,
+                                    borderColor: `${matchedAcc.color}35`,
+                                    color: matchedAcc.color,
+                                  }
+                                : {
+                                    backgroundColor: '#f1f5f9',
+                                    borderColor: '#e2e8f0',
+                                    color: '#334155',
+                                  }
+                            }
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: matchedAcc?.color || '#64748b' }}
+                            />
+                            <span>{accName}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-2 mt-1 flex-wrap">

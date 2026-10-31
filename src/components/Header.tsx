@@ -1,5 +1,5 @@
 import React from 'react';
-import { WalletCards, RotateCcw, Calendar, HardDrive, CloudCheck, Tag } from 'lucide-react';
+import { WalletCards, RotateCcw, Calendar, HardDrive, CloudCheck, Tag, CreditCard } from 'lucide-react';
 import { getFullPersianDateHeader, toPersianDigits } from '../utils/persian';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   onResetData: () => void;
   onOpenBackupModal: () => void;
   onOpenCategoryModal?: () => void;
+  onOpenAccountModal?: () => void;
   userEmail?: string | null;
 }
 
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetData,
   onOpenBackupModal,
   onOpenCategoryModal,
+  onOpenAccountModal,
   userEmail,
 }) => {
   const currentDate = getFullPersianDateHeader();
@@ -71,6 +73,19 @@ export const Header: React.FC<HeaderProps> = ({
             <Calendar className="w-3.5 h-3.5 text-slate-600" />
             <span>{currentDate}</span>
           </div>
+
+          {/* دکمه مدیریت حساب‌ها و کارت‌ها */}
+          {onOpenAccountModal && (
+            <button
+              id="account-manager-btn"
+              onClick={onOpenAccountModal}
+              title="مدیریت و تعریف حساب‌ها و کارت‌های بانکی"
+              className="flex items-center gap-1.5 text-xs text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer font-medium"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+              <span>کارت‌ها و حساب‌ها</span>
+            </button>
+          )}
 
           {/* دکمه مدیریت دسته‌بندی‌ها */}
           {onOpenCategoryModal && (

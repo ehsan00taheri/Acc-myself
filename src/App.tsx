@@ -5,10 +5,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User } from 'firebase/auth';
-import { Transaction, FilterType, CustomCategory } from './types';
-import { INITIAL_TRANSACTIONS, DEFAULT_ACCOUNTS } from './utils/persian';
+import { Transaction, FilterType, CustomCategory, Account } from './types';
+import { INITIAL_TRANSACTIONS, INITIAL_ACCOUNTS } from './utils/persian';
 import { Header } from './components/Header';
 import { SummaryCards } from './components/SummaryCards';
+import { AccountCardsBanner } from './components/AccountCardsBanner';
 import { ExpenseDistributionChart } from './components/ExpenseDistributionChart';
 import { TransactionInput } from './components/TransactionInput';
 import { TransactionList } from './components/TransactionList';
@@ -17,11 +18,14 @@ import { GoogleDriveSync } from './components/GoogleDriveSync';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { EditTransactionModal } from './components/EditTransactionModal';
+import { AccountManagerModal } from './components/AccountManagerModal';
 import {
   loadTransactions,
   saveTransactions,
   loadCustomCategories,
   saveCustomCategories,
+  loadAccounts,
+  saveAccounts,
 } from './services/storage';
 import { initAuth } from './services/driveAuth';
 
@@ -39,6 +43,15 @@ export default function App() {
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => {
     const saved = loadCustomCategories();
     return saved || [];
+  });
+
+  // بارگذاری حساب‌ها و کارت‌های بانکی از حافظه محلی
+  const [accounts, setAccounts] = useState<Account[]>(() => {
+    const saved = loadAccounts();
+    if (saved && saved.length > 0) {
+      return saved;
+    }
+    return INITIAL_ACCOUNTS;
   });
 
   // کاربر گوگل و توکن دسترسی Google Drive
@@ -60,8 +73,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // فیلتر فعال لیست تراکنش‌ها
+  // فیلتر فعال نوع تراکنش (همه / هزینه / درآمد)
   const [filter, setFilter] = useState<FilterType>('all');
+
+  // فیلتر حساب برای کارت‌ها و تراکنش‌ها (all یا نام حساب)
+  const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('all');
 
   // فیلتر حساب برای نمودار دایره‌ای
   const [chartAccountFilter, setChartAccountFilter] = useState<string>('all');
@@ -72,17 +88,20 @@ export default function App() {
   // وضعیت باز/بسته بودن مودال مدیریت دسته‌بندی‌ها
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
 
+  // وضعیت باز/بسته بودن مودال مدیریت حساب‌ها و کارت‌ها
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
+
   // تراکنش در حال ویرایش
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
-  // لیست حساب‌های منحصر به فرد موجود در تراکنش‌ها + حساب‌های پیش‌فرض
+  // لیست اسامی تمام حساب‌های موجود برای فرم‌ها
   const availableAccounts = useMemo(() => {
-    const set = new Set<string>(DEFAULT_ACCOUNTS);
+    const set = new Set<string>(accounts.map((a) => a.name));
     transactions.forEach((tx) => {
       if (tx.account) set.add(tx.account);
     });
     return Array.from(set);
-  }, [transactions]);
+  }, [accounts, transactions]);
 
   // ذخیره‌سازی خودکار تغییرات تراکنش‌ها در حافظه محلی
   useEffect(() => {
@@ -94,12 +113,17 @@ export default function App() {
     saveCustomCategories(customCategories);
   }, [customCategories]);
 
+  // ذخیره‌سازی خودکار حساب‌ها و کارت‌ها در حافظه محلی
+  useEffect(() => {
+    saveAccounts(accounts);
+  }, [accounts]);
+
   // افزودن تراکنش جدید به ابتدای لیست
   const handleAddTransaction = (newTx: Transaction) => {
     setTransactions((prev) => [newTx, ...prev]);
   };
 
-  // ذخیره ویرایش تراکنش موجود (و به‌روزرسانی دسته‌بندی یا مبلغ)
+  // ذخیره ویرایش تراکنش موجود
   const handleSaveEditTransaction = (updatedTx: Transaction) => {
     setTransactions((prev) =>
       prev.map((tx) => (tx.id === updatedTx.id ? updatedTx : tx))
@@ -109,6 +133,69 @@ export default function App() {
   // حذف یک تراکنش بر اساس شناسه
   const handleDeleteTransaction = (id: string) => {
     setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+  };
+
+  // افزودن حساب / کارت جدید
+  const handleAddAccount = (newAcc: Account) => {
+    setAccounts((prev) => [...prev, newAcc]);
+  };
+
+  // ویرایش حساب / کارت و انتقال خودکار تراکنش‌ها در صورت تغییر نام
+  const handleUpdateAccount = (oldName: string, updatedAcc: Account) => {
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === updatedAcc.id ? updatedAcc : a))
+    );
+
+    if (oldName !== updatedAcc.name) {
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          (tx.account || '').trim().toLowerCase() === oldName.trim().toLowerCase()
+            ? { ...tx, account: updatedAcc.name }
+            : tx
+        )
+      );
+      if (selectedAccountFilter === oldName) {
+        setSelectedAccountFilter(updatedAcc.name);
+      }
+      if (chartAccountFilter === oldName) {
+        setChartAccountFilter(updatedAcc.name);
+      }
+    }
+  };
+
+  // حذف حساب / کارت و انتقال اختیاری تراکنش‌های آن
+  const handleDeleteAccount = (accountId: string, reassignTo?: string) => {
+    const target = accounts.find((a) => a.id === accountId);
+    if (!target) return;
+
+    setAccounts((prev) => prev.filter((a) => a.id !== accountId));
+
+    if (reassignTo) {
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          (tx.account || '').trim().toLowerCase() === target.name.trim().toLowerCase()
+            ? { ...tx, account: reassignTo }
+            : tx
+        )
+      );
+    }
+
+    if (selectedAccountFilter === target.name) {
+      setSelectedAccountFilter('all');
+    }
+    if (chartAccountFilter === target.name) {
+      setChartAccountFilter('all');
+    }
+  };
+
+  // تنظیم کارت پیش‌فرض
+  const handleSetDefaultAccount = (accountId: string) => {
+    setAccounts((prev) =>
+      prev.map((a) => ({
+        ...a,
+        isDefault: a.id === accountId,
+      }))
+    );
   };
 
   // افزودن یک دسته‌بندی شخصی جدید
@@ -122,7 +209,6 @@ export default function App() {
       prev.map((c) => (c.name === oldName ? updatedCat : c))
     );
 
-    // اگر نام دسته‌بندی تغییر کرد، تمام تراکنش‌های ثبت‌شده قبلی نیز به‌روز می‌شوند
     if (oldName !== updatedCat.name) {
       setTransactions((prev) =>
         prev.map((tx) =>
@@ -142,7 +228,6 @@ export default function App() {
       )
     );
 
-    // انتقال تراکنش‌های دارای این دسته‌بندی به دسته تعیین‌شده (پیش‌فرض «سایر»)
     setTransactions((prev) =>
       prev.map((tx) =>
         (tx.category || '').trim().toLowerCase() === categoryName.trim().toLowerCase()
@@ -156,6 +241,7 @@ export default function App() {
   const handleResetData = () => {
     setTransactions([]);
     saveTransactions([]);
+    setSelectedAccountFilter('all');
     setChartAccountFilter('all');
   };
 
@@ -164,7 +250,6 @@ export default function App() {
     if (mode === 'replace') {
       setTransactions(imported);
     } else {
-      // ادغام بدون تکرار شناسه‌ها
       setTransactions((prev) => {
         const existingIds = new Set(prev.map((t) => t.id));
         const newOnes = imported.filter((t) => !existingIds.has(t.id));
@@ -184,6 +269,17 @@ export default function App() {
     });
   };
 
+  // وارد کردن حساب‌ها از فایل پشتیبان
+  const handleImportAccounts = (importedAccounts: Account[]) => {
+    setAccounts((prev) => {
+      const existingNames = new Set(prev.map((a) => a.name.trim().toLowerCase()));
+      const toAdd = importedAccounts.filter(
+        (a) => !existingNames.has(a.name.trim().toLowerCase())
+      );
+      return [...prev, ...toAdd];
+    });
+  };
+
   // به‌روزرسانی تراکنش‌ها از Google Drive
   const handleUpdateTransactionsFromDrive = (driveTransactions: Transaction[]) => {
     setTransactions(driveTransactions);
@@ -192,6 +288,11 @@ export default function App() {
   // به‌روزرسانی دسته‌بندی‌های شخصی از Google Drive
   const handleUpdateCategoriesFromDrive = (driveCategories: CustomCategory[]) => {
     setCustomCategories(driveCategories);
+  };
+
+  // به‌روزرسانی حساب‌ها از Google Drive
+  const handleUpdateAccountsFromDrive = (driveAccounts: Account[]) => {
+    setAccounts(driveAccounts);
   };
 
   // محاسبه مجموع درآمدها
@@ -210,12 +311,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       <div>
-        {/* هدر صفحه با دکمه دسته‌بندی‌ها و پشتیبان‌گیری */}
+        {/* هدر صفحه با دکمه کارت‌ها، دسته‌بندی‌ها و پشتیبان‌گیری */}
         <Header
           transactionCount={transactions.length}
           onResetData={handleResetData}
           onOpenBackupModal={() => setIsBackupModalOpen(true)}
           onOpenCategoryModal={() => setIsCategoryModalOpen(true)}
+          onOpenAccountModal={() => setIsAccountModalOpen(true)}
           userEmail={user?.email || null}
         />
 
@@ -229,6 +331,15 @@ export default function App() {
             totalIncome={totalIncome}
             totalExpense={totalExpense}
             balance={balance}
+          />
+
+          {/* بخش جدید: حساب‌ها و کارت‌های بانکی کاربر به همراه موجودی زنده هر کارت */}
+          <AccountCardsBanner
+            accounts={accounts}
+            transactions={transactions}
+            selectedAccountFilter={selectedAccountFilter}
+            onSelectAccountFilter={setSelectedAccountFilter}
+            onOpenAccountManager={() => setIsAccountModalOpen(true)}
           />
 
           {/* بخش ۲: همگام‌سازی ابری با Google Drive (ذخیره مستقیم روی درایو ایمیل لاگین‌شده) */}
@@ -247,6 +358,8 @@ export default function App() {
             onUpdateTransactionsFromDrive={handleUpdateTransactionsFromDrive}
             customCategories={customCategories}
             onUpdateCategoriesFromDrive={handleUpdateCategoriesFromDrive}
+            accounts={accounts}
+            onUpdateAccountsFromDrive={handleUpdateAccountsFromDrive}
           />
 
           {/* بخش ۳: نمودار دایره‌ای توزیع هزینه‌ها بر اساس دسته‌بندی و حساب با Recharts */}
@@ -258,15 +371,17 @@ export default function App() {
             customCategories={customCategories}
           />
 
-          {/* بخش ۴: ورودی ثبت تراکنش (با هوش مصنوعی یا دستی مستقیم به همراه دسته‌بندی‌های شخصی) */}
+          {/* بخش ۴: ورودی ثبت تراکنش با دسترسی مستقیم به کارت‌ها و دسته‌ها */}
           <TransactionInput
             onAddTransaction={handleAddTransaction}
             availableAccounts={availableAccounts}
+            accounts={accounts}
             customCategories={customCategories}
             onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
+            onOpenAccountManager={() => setIsAccountModalOpen(true)}
           />
 
-          {/* بخش ۵: لیست تراکنش‌ها به همراه قابلیت ویرایش و تغییر دسته */}
+          {/* بخش ۵: لیست تراکنش‌ها به همراه فیلتر کارت انتخابی و ویرایش */}
           <TransactionList
             transactions={transactions}
             filter={filter}
@@ -275,9 +390,24 @@ export default function App() {
             onEditTransaction={(tx) => setEditingTransaction(tx)}
             customCategories={customCategories}
             onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
+            accounts={accounts}
+            selectedAccountFilter={selectedAccountFilter}
+            onClearAccountFilter={() => setSelectedAccountFilter('all')}
           />
         </main>
       </div>
+
+      {/* مودال مدیریت و تعریف حساب‌ها و کارت‌های بانکی */}
+      <AccountManagerModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        accounts={accounts}
+        onAddAccount={handleAddAccount}
+        onUpdateAccount={handleUpdateAccount}
+        onDeleteAccount={handleDeleteAccount}
+        onSetDefaultAccount={handleSetDefaultAccount}
+        transactions={transactions}
+      />
 
       {/* مودال مدیریت و ایجاد دسته‌بندی‌های شخصی */}
       <CategoryManagerModal
@@ -298,7 +428,9 @@ export default function App() {
         onSave={handleSaveEditTransaction}
         customCategories={customCategories}
         availableAccounts={availableAccounts}
+        accounts={accounts}
         onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
+        onOpenAccountManager={() => setIsAccountModalOpen(true)}
       />
 
       {/* مودال پشتیبان‌گیری و انتقال به Google Drive */}
@@ -309,6 +441,8 @@ export default function App() {
         onImportTransactions={handleImportTransactions}
         customCategories={customCategories}
         onImportCustomCategories={handleImportCustomCategories}
+        accounts={accounts}
+        onImportAccounts={handleImportAccounts}
       />
 
       {/* فوتر مینیمال */}

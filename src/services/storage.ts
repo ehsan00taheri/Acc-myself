@@ -2,10 +2,11 @@
  * ماژول مدیریت حافظه، پشتیبان‌گیری، خروجی اکسل/CSV و ذخیره‌سازی داده‌ها و دسته‌بندی‌ها
  */
 
-import { Transaction, CustomCategory } from '../types';
+import { Transaction, CustomCategory, Account } from '../types';
 
 export const STORAGE_KEY = 'smart_accounting_transactions_v2';
 export const CATEGORIES_STORAGE_KEY = 'smart_accounting_custom_categories_v1';
+export const ACCOUNTS_STORAGE_KEY = 'smart_accounting_accounts_v1';
 
 // ذخیره‌سازی تراکنش‌ها در LocalStorage
 export function saveTransactions(transactions: Transaction[]): void {
@@ -59,18 +60,45 @@ export function loadCustomCategories(): CustomCategory[] | null {
   return null;
 }
 
+// ذخیره‌سازی حساب‌ها و کارت‌های کاربر در LocalStorage
+export function saveAccounts(accounts: Account[]): void {
+  try {
+    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  } catch (error) {
+    console.error('خطا در ذخیره‌سازی حساب‌ها:', error);
+  }
+}
+
+// بارگذاری حساب‌ها و کارت‌های کاربر از LocalStorage
+export function loadAccounts(): Account[] | null {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('خطا در خواندن حساب‌ها از حافظه:', error);
+  }
+  return null;
+}
+
 // خروجی پشتیبان به صورت فایل JSON برای ذخیره در Google Drive یا دستگاه کاربر
 export function exportBackupJSON(
   transactions: Transaction[],
-  customCategories?: CustomCategory[]
+  customCategories?: CustomCategory[],
+  accounts?: Account[]
 ): void {
   const exportData = {
     appName: 'حسابداری شخصی هوشمند',
-    version: '2.1.0',
+    version: '2.2.0',
     exportDate: new Date().toISOString(),
     transactionsCount: transactions.length,
     customCategoriesCount: (customCategories || []).length,
     customCategories: customCategories || [],
+    accountsCount: (accounts || []).length,
+    accounts: accounts || [],
     data: transactions,
   };
 
@@ -136,6 +164,7 @@ export function exportToCSV(transactions: Transaction[]): void {
 export interface ImportResult {
   transactions: Transaction[];
   customCategories?: CustomCategory[];
+  accounts?: Account[];
 }
 
 // خواندن و اعتبارسنجی فایل پشتیبان JSON
@@ -149,6 +178,7 @@ export function importBackupJSON(file: File): Promise<ImportResult> {
 
         let txList: Transaction[] = [];
         let categories: CustomCategory[] = [];
+        let importedAccounts: Account[] = [];
 
         if (Array.isArray(parsed)) {
           txList = parsed;
@@ -161,6 +191,10 @@ export function importBackupJSON(file: File): Promise<ImportResult> {
 
           if (Array.isArray(parsed.customCategories)) {
             categories = parsed.customCategories;
+          }
+
+          if (Array.isArray(parsed.accounts)) {
+            importedAccounts = parsed.accounts;
           }
         } else {
           throw new Error('ساختار فایل پشتیبان معتبر نیست.');
@@ -181,6 +215,7 @@ export function importBackupJSON(file: File): Promise<ImportResult> {
         resolve({
           transactions: validated,
           customCategories: categories.length > 0 ? categories : undefined,
+          accounts: importedAccounts.length > 0 ? importedAccounts : undefined,
         });
       } catch (err: any) {
         reject(err.message || 'خطا در خواندن فایل پشتیبان.');

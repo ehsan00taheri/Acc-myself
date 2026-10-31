@@ -10,7 +10,7 @@ import {
   Plus,
   AlertCircle,
 } from 'lucide-react';
-import { Transaction, TransactionType, CustomCategory } from '../types';
+import { Transaction, TransactionType, CustomCategory, Account } from '../types';
 import {
   formatPersianCurrency,
   toPersianDigits,
@@ -26,7 +26,9 @@ interface EditTransactionModalProps {
   onSave: (updated: Transaction) => void;
   customCategories: CustomCategory[];
   availableAccounts: string[];
+  accounts?: Account[];
   onOpenCategoryManager: () => void;
+  onOpenAccountManager?: () => void;
 }
 
 export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
@@ -36,7 +38,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   onSave,
   customCategories,
   availableAccounts,
+  accounts = [],
   onOpenCategoryManager,
+  onOpenAccountManager,
 }) => {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<number>(0);
@@ -286,20 +290,37 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           {/* حساب بانکی یا کارت */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-                <span>حساب / کارت</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>حساب / کارت</span>
+                </label>
+                {onOpenAccountManager && (
+                  <button
+                    type="button"
+                    onClick={onOpenAccountManager}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                  >
+                    + کارت جدید
+                  </button>
+                )}
+              </div>
               <select
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
               >
-                {Array.from(new Set([...DEFAULT_ACCOUNTS, ...availableAccounts])).map((acc) => (
-                  <option key={acc} value={acc}>
-                    {acc}
-                  </option>
-                ))}
+                {accounts.length > 0
+                  ? accounts.map((acc) => (
+                      <option key={acc.id} value={acc.name}>
+                        {acc.name} {acc.cardNumber ? `(•• ${toPersianDigits(acc.cardNumber.slice(-4))})` : ''} {acc.bankName ? `[${acc.bankName}]` : ''}
+                      </option>
+                    ))
+                  : Array.from(new Set([...DEFAULT_ACCOUNTS, ...availableAccounts])).map((acc) => (
+                      <option key={acc} value={acc}>
+                        {acc}
+                      </option>
+                    ))}
               </select>
             </div>
 

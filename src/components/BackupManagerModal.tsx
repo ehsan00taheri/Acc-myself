@@ -11,7 +11,7 @@ import {
   FileJson,
   ShieldCheck,
 } from 'lucide-react';
-import { Transaction, CustomCategory } from '../types';
+import { Transaction, CustomCategory, Account } from '../types';
 import { exportBackupJSON, exportToCSV, importBackupJSON } from '../services/storage';
 import { toPersianDigits } from '../utils/persian';
 
@@ -22,6 +22,8 @@ interface BackupManagerModalProps {
   onImportTransactions: (imported: Transaction[], mode: 'replace' | 'merge') => void;
   customCategories?: CustomCategory[];
   onImportCustomCategories?: (categories: CustomCategory[]) => void;
+  accounts?: Account[];
+  onImportAccounts?: (accounts: Account[]) => void;
 }
 
 export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
@@ -31,6 +33,8 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
   onImportTransactions,
   customCategories = [],
   onImportCustomCategories,
+  accounts = [],
+  onImportAccounts,
 }) => {
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge');
@@ -40,9 +44,9 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
 
   const handleExportJSON = () => {
     try {
-      exportBackupJSON(transactions, customCategories);
+      exportBackupJSON(transactions, customCategories, accounts);
       setStatusMessage({
-        text: `فایل پشتیبان JSON شامل ${toPersianDigits(transactions.length)} تراکنش و ${toPersianDigits(customCategories.length)} دسته‌بندی شخصی دانلود شد.`,
+        text: `فایل پشتیبان JSON شامل ${toPersianDigits(transactions.length)} تراکنش، ${toPersianDigits(customCategories.length)} دسته و ${toPersianDigits(accounts.length)} حساب/کارت دانلود شد.`,
         type: 'success',
       });
     } catch (e: any) {
@@ -72,9 +76,14 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
       if (result.customCategories && onImportCustomCategories) {
         onImportCustomCategories(result.customCategories);
       }
+      if (result.accounts && onImportAccounts) {
+        onImportAccounts(result.accounts);
+      }
       setStatusMessage({
-        text: `تعداد ${toPersianDigits(result.transactions.length)} تراکنش ${
-          result.customCategories ? `و ${toPersianDigits(result.customCategories.length)} دسته‌بندی شخصی ` : ''
+        text: `تعداد ${toPersianDigits(result.transactions.length)} تراکنش${
+          result.accounts ? `، ${toPersianDigits(result.accounts.length)} حساب ` : ''
+        }${
+          result.customCategories ? `و ${toPersianDigits(result.customCategories.length)} دسته‌بندی ` : ' '
         }با موفقیت ${importMode === 'merge' ? 'ادغام شد' : 'جایگزین شد'}.`,
         type: 'success',
       });

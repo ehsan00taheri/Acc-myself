@@ -50,7 +50,7 @@ export function getFullPersianDateHeader(): string {
   }
 }
 
-import { Transaction, CustomCategory } from '../types';
+import { Transaction, CustomCategory, Account } from '../types';
 
 // پیکربندی دسته‌بندی‌ها به همراه رنگ و استایل
 export interface CategoryConfig {
@@ -308,16 +308,98 @@ export function getCategoryStyle(
   };
 }
 
-// لیست حساب‌های پیش‌فرض برای انتخاب سریع
-export const DEFAULT_ACCOUNTS = [
-  'کارت اصلی',
-  'کارت بانک ملی',
-  'حساب بانک ملت',
-  'بلو بانک',
-  'بانک سامان',
-  'بانک پاسارگاد',
-  'نقدی / کیف پول',
+// بانک‌های متداول ایران با رنگ و آیکون پیش‌فرض
+export interface BankPreset {
+  name: string;
+  defaultColor: string;
+  iconName: string;
+}
+
+export const IRAN_BANKS: BankPreset[] = [
+  { name: 'بلو بانک', defaultColor: '#6366f1', iconName: 'CreditCard' },
+  { name: 'بانک سامان', defaultColor: '#1d4ed8', iconName: 'Landmark' },
+  { name: 'بانک ملی', defaultColor: '#047857', iconName: 'Landmark' },
+  { name: 'بانک ملت', defaultColor: '#b91c1c', iconName: 'Landmark' },
+  { name: 'بانک پاسارگاد', defaultColor: '#ca8a04', iconName: 'Landmark' },
+  { name: 'بانک صادرات', defaultColor: '#1e293b', iconName: 'Landmark' },
+  { name: 'بانک تجارت', defaultColor: '#0284c7', iconName: 'Landmark' },
+  { name: 'بانک رسالت', defaultColor: '#059669', iconName: 'Landmark' },
+  { name: 'بانک مهر ایران', defaultColor: '#15803d', iconName: 'Landmark' },
+  { name: 'بانک پارسیان', defaultColor: '#dc2626', iconName: 'Landmark' },
+  { name: 'بانک سپه', defaultColor: '#334155', iconName: 'Landmark' },
+  { name: 'بانک شهر', defaultColor: '#991b1b', iconName: 'Landmark' },
+  { name: 'بانک مسکن', defaultColor: '#ea580c', iconName: 'Home' },
+  { name: 'بانک کشاورزی', defaultColor: '#16a34a', iconName: 'Landmark' },
+  { name: 'بانک آینده', defaultColor: '#7c3aed', iconName: 'Landmark' },
+  { name: 'کیف پول نقدی', defaultColor: '#d97706', iconName: 'Wallet' },
+  { name: 'سایر حساب‌ها', defaultColor: '#475569', iconName: 'CreditCard' },
 ];
+
+// رنگ‌های شیک و مدرن برای طراحی کارت‌های بانکی
+export const CARD_COLOR_PRESETS = [
+  { label: 'بنفش نئون (بلو)', hex: '#6366f1', gradient: 'from-indigo-600 to-purple-800' },
+  { label: 'آبی اقیانوسی (سامان)', hex: '#1d4ed8', gradient: 'from-blue-600 to-indigo-950' },
+  { label: 'سبز سلطنتی (ملی)', hex: '#047857', gradient: 'from-emerald-600 to-teal-950' },
+  { label: 'قرمز یاقوتی (ملت)', hex: '#b91c1c', gradient: 'from-rose-600 to-red-950' },
+  { label: 'طلایی متالیک (پاسارگاد)', hex: '#ca8a04', gradient: 'from-amber-500 to-yellow-800' },
+  { label: 'مشکی کربن (Black Card)', hex: '#0f172a', gradient: 'from-slate-800 to-slate-950' },
+  { label: 'فیروزه‌ای (تجارت)', hex: '#0284c7', gradient: 'from-cyan-600 to-blue-900' },
+  { label: 'سبز زمردی (رسالت)', hex: '#059669', gradient: 'from-green-600 to-emerald-900' },
+  { label: 'نارنجی پرتقالی (مسکن)', hex: '#ea580c', gradient: 'from-orange-500 to-red-700' },
+  { label: 'صورتی مدرن', hex: '#db2777', gradient: 'from-pink-600 to-rose-800' },
+  { label: 'کهربایی (کیف پول نقدی)', hex: '#d97706', gradient: 'from-amber-600 to-amber-900' },
+];
+
+// لیست حساب‌ها و کارت‌های اولیه سیستم
+export const INITIAL_ACCOUNTS: Account[] = [
+  {
+    id: 'acc-main',
+    name: 'کارت اصلی',
+    bankName: 'بانک سامان',
+    cardNumber: '۶۲۱۹',
+    color: '#1d4ed8',
+    iconName: 'CreditCard',
+    initialBalance: 0,
+    isDefault: true,
+    isCustom: false,
+  },
+  {
+    id: 'acc-blu',
+    name: 'بلو بانک',
+    bankName: 'بلو بانک',
+    cardNumber: '۸۶۰۱',
+    color: '#6366f1',
+    iconName: 'CreditCard',
+    initialBalance: 0,
+    isDefault: false,
+    isCustom: false,
+  },
+  {
+    id: 'acc-melli',
+    name: 'کارت بانک ملی',
+    bankName: 'بانک ملی',
+    cardNumber: '۶۰۳۷',
+    color: '#047857',
+    iconName: 'Landmark',
+    initialBalance: 0,
+    isDefault: false,
+    isCustom: false,
+  },
+  {
+    id: 'acc-cash',
+    name: 'نقدی / کیف پول',
+    bankName: 'کیف پول نقدی',
+    cardNumber: '',
+    color: '#d97706',
+    iconName: 'Wallet',
+    initialBalance: 0,
+    isDefault: false,
+    isCustom: false,
+  },
+];
+
+// لیست حساب‌های پیش‌فرض برای سازگاری به عقب
+export const DEFAULT_ACCOUNTS = INITIAL_ACCOUNTS.map((a) => a.name);
 
 // تراکنش‌های اولیه خالی برای شروع پاک و بدون اطلاعات تستی
 export const INITIAL_TRANSACTIONS: Transaction[] = [];

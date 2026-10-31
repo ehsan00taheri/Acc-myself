@@ -25,7 +25,7 @@ import {
   saveDatabaseToDrive,
   DriveFileInfo,
 } from '../services/googleDrive';
-import { Transaction, CustomCategory } from '../types';
+import { Transaction, CustomCategory, Account } from '../types';
 import { toPersianDigits, formatPersianCurrency } from '../utils/persian';
 
 interface GoogleDriveSyncProps {
@@ -37,6 +37,8 @@ interface GoogleDriveSyncProps {
   onUpdateTransactionsFromDrive: (transactions: Transaction[]) => void;
   customCategories?: CustomCategory[];
   onUpdateCategoriesFromDrive?: (categories: CustomCategory[]) => void;
+  accounts?: Account[];
+  onUpdateAccountsFromDrive?: (accounts: Account[]) => void;
 }
 
 export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
@@ -48,6 +50,8 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
   onUpdateTransactionsFromDrive,
   customCategories = [],
   onUpdateCategoriesFromDrive,
+  accounts = [],
+  onUpdateAccountsFromDrive,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -192,7 +196,8 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         transactions,
         driveFile?.id,
         user?.email || undefined,
-        customCategories
+        customCategories,
+        accounts
       );
 
       setDriveFile((prev) => ({
@@ -207,9 +212,11 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
       setFeedback({
         type: 'success',
-        text: `تعداد ${toPersianDigits(transactions.length)} تراکنش ${
-          customCategories.length > 0 ? `و ${toPersianDigits(customCategories.length)} دسته‌بندی شخصی ` : ''
-        }با موفقیت در دیتابیس Google Drive ایمیل شما ذخیره شد.`,
+        text: `تعداد ${toPersianDigits(transactions.length)} تراکنش${
+          accounts.length > 0 ? `، ${toPersianDigits(accounts.length)} حساب ` : ''
+        }${
+          customCategories.length > 0 ? `و ${toPersianDigits(customCategories.length)} دسته‌بندی ` : ' '
+        }با موفقیت در Google Drive ایمیل شما ذخیره شد.`,
       });
     } catch (err: any) {
       setFeedback({
@@ -249,12 +256,18 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         setDriveFile(file);
       }
 
-      const { transactions: driveTransactions, customCategories: driveCategories } =
-        await loadDatabaseFromDrive(accessToken, targetFileId);
+      const {
+        transactions: driveTransactions,
+        customCategories: driveCategories,
+        accounts: driveAccounts,
+      } = await loadDatabaseFromDrive(accessToken, targetFileId);
 
       onUpdateTransactionsFromDrive(driveTransactions);
       if (driveCategories && onUpdateCategoriesFromDrive) {
         onUpdateCategoriesFromDrive(driveCategories);
+      }
+      if (driveAccounts && onUpdateAccountsFromDrive) {
+        onUpdateAccountsFromDrive(driveAccounts);
       }
 
       const now = new Date();
@@ -263,9 +276,11 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
       setFeedback({
         type: 'success',
-        text: `دیتابیس از Google Drive بارگذاری شد (${toPersianDigits(driveTransactions.length)} تراکنش ${
-          driveCategories ? `و ${toPersianDigits(driveCategories.length)} دسته شخصی ` : ''
-        }همگام شد).`,
+        text: `دیتابیس از Google Drive بارگذاری شد (${toPersianDigits(driveTransactions.length)} تراکنش${
+          driveAccounts ? `، ${toPersianDigits(driveAccounts.length)} حساب` : ''
+        }${
+          driveCategories ? ` و ${toPersianDigits(driveCategories.length)} دسته` : ''
+        } همگام شد).`,
       });
     } catch (err: any) {
       setFeedback({

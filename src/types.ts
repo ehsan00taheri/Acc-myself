@@ -14,6 +14,18 @@ export interface CustomCategory {
   isCustom?: boolean;
 }
 
+export interface Account {
+  id: string;
+  name: string; // نام حساب یا کارت (مثلاً کارت اصلی، بلو بانک، نقدی)
+  bankName?: string; // نام بانک یا نوع (سامان، ملی، ملت، بلو، صادرات، نقدی، ...)
+  cardNumber?: string; // شماره کارت یا ۴ رقم آخر (اختیاری)
+  color: string; // کد رنگ هگز یا کلاس گرادینت
+  iconName?: string; // آیکون کارت
+  initialBalance: number; // موجودی اولیه حساب به تومان
+  isDefault?: boolean; // آیا کارت پیش‌فرض است؟
+  isCustom?: boolean; // تعریف‌شده توسط کاربر
+}
+
 export interface Transaction {
   id: string;
   title: string;

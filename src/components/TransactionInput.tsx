@@ -10,19 +10,22 @@ import {
   FileText,
   ArrowLeft,
 } from 'lucide-react';
-import { Transaction, CustomCategory, TransactionType } from '../types';
+import { Transaction, CustomCategory, TransactionType, Account } from '../types';
 import {
   getCurrentPersianDate,
   DEFAULT_ACCOUNTS,
   DEFAULT_CATEGORIES,
   formatPersianCurrency,
+  toPersianDigits,
 } from '../utils/persian';
 
 interface TransactionInputProps {
   onAddTransaction: (transaction: Transaction) => void;
   availableAccounts?: string[];
+  accounts?: Account[];
   customCategories?: CustomCategory[];
   onOpenCategoryManager?: () => void;
+  onOpenAccountManager?: () => void;
 }
 
 // عناوین متداول برای پر کردن سریع عنوان با یک لمس
@@ -44,14 +47,22 @@ const QUICK_TITLES = [
 export const TransactionInput: React.FC<TransactionInputProps> = ({
   onAddTransaction,
   availableAccounts = DEFAULT_ACCOUNTS,
+  accounts = [],
   customCategories = [],
   onOpenCategoryManager,
+  onOpenAccountManager,
 }) => {
+  const defaultAccountName =
+    accounts.find((a) => a.isDefault)?.name ||
+    accounts[0]?.name ||
+    availableAccounts[0] ||
+    'کارت اصلی';
+
   const [type, setType] = useState<TransactionType>('expense');
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [category, setCategory] = useState<string>('خوراک و نوشیدنی');
-  const [account, setAccount] = useState<string>('کارت اصلی');
+  const [account, setAccount] = useState<string>(defaultAccountName);
   const [persianDate, setPersianDate] = useState<string>(getCurrentPersianDate());
   const [note, setNote] = useState<string>('');
 
@@ -275,21 +286,38 @@ export const TransactionInput: React.FC<TransactionInputProps> = ({
 
           {/* حساب یا کارت */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-              <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-              <span>حساب / کارت</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                <span>حساب / کارت</span>
+              </label>
+              {onOpenAccountManager && (
+                <button
+                  type="button"
+                  onClick={onOpenAccountManager}
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+                >
+                  + کارت جدید
+                </button>
+              )}
+            </div>
             <select
               id="transaction-account-select"
               value={account}
               onChange={(e) => setAccount(e.target.value)}
               className="w-full px-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer"
             >
-              {availableAccounts.map((acc) => (
-                <option key={acc} value={acc}>
-                  {acc}
-                </option>
-              ))}
+              {accounts.length > 0
+                ? accounts.map((acc) => (
+                    <option key={acc.id} value={acc.name}>
+                      {acc.name} {acc.cardNumber ? `(•• ${toPersianDigits(acc.cardNumber.slice(-4))})` : ''} {acc.bankName ? `[${acc.bankName}]` : ''}
+                    </option>
+                  ))
+                : availableAccounts.map((acc) => (
+                    <option key={acc} value={acc}>
+                      {acc}
+                    </option>
+                  ))}
             </select>
           </div>
 

@@ -2,7 +2,7 @@
  * ماژول تعامل با Google Drive API v3 جهت ذخیره، همگام‌سازی و خواندن تراکنش‌ها و دسته‌بندی‌ها
  */
 
-import { Transaction, CustomCategory } from '../types';
+import { Transaction, CustomCategory, Account } from '../types';
 
 export const DRIVE_FILENAME = 'hesabdari_personal_finance.json';
 
@@ -20,6 +20,7 @@ export interface DriveStoragePayload {
   userEmail?: string;
   transactions: Transaction[];
   customCategories?: CustomCategory[];
+  accounts?: Account[];
 }
 
 /**
@@ -62,6 +63,7 @@ export async function loadDatabaseFromDrive(
 ): Promise<{
   transactions: Transaction[];
   customCategories?: CustomCategory[];
+  accounts?: Account[];
   modifiedTime?: string;
 }> {
   const response = await fetch(
@@ -81,6 +83,7 @@ export async function loadDatabaseFromDrive(
   const json = await response.json();
   let list: Transaction[] = [];
   let categories: CustomCategory[] = [];
+  let accountsList: Account[] = [];
 
   if (Array.isArray(json)) {
     list = json;
@@ -94,6 +97,10 @@ export async function loadDatabaseFromDrive(
     if (Array.isArray(json.customCategories)) {
       categories = json.customCategories;
     }
+
+    if (Array.isArray(json.accounts)) {
+      accountsList = json.accounts;
+    }
   }
 
   // اعتبارسنجی اولیه ساختار تراکنش‌ها
@@ -104,27 +111,30 @@ export async function loadDatabaseFromDrive(
   return {
     transactions: validList,
     customCategories: categories.length > 0 ? categories : undefined,
+    accounts: accountsList.length > 0 ? accountsList : undefined,
     modifiedTime: json?.updatedAt,
   };
 }
 
 /**
- * ذخیره یا به‌روزرسانی فایل تراکنش‌ها و دسته‌بندی‌ها در گوگل درایو
+ * ذخیره یا به‌روزرسانی فایل تراکنش‌ها، دسته‌بندی‌ها و حساب‌ها در گوگل درایو
  */
 export async function saveDatabaseToDrive(
   accessToken: string,
   transactions: Transaction[],
   existingFileId?: string | null,
   userEmail?: string,
-  customCategories?: CustomCategory[]
+  customCategories?: CustomCategory[],
+  accounts?: Account[]
 ): Promise<{ fileId: string; modifiedTime: string }> {
   const payload: DriveStoragePayload = {
     app: 'hesabdari-smart-pwa',
-    version: '2.6.0',
+    version: '2.7.0',
     updatedAt: new Date().toISOString(),
     userEmail: userEmail || undefined,
     transactions,
     customCategories: customCategories || [],
+    accounts: accounts || [],
   };
 
   const content = JSON.stringify(payload, null, 2);
